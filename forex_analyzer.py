@@ -1,0 +1,67 @@
+import os, openai, requests, time
+
+openai.api_key = os.environ["OPENAI_API_KEY"]
+telegram_token = os.environ["TELEGRAM_BOT_TOKEN"]
+chat_id = os.environ["TELEGRAM_CHAT_ID"]
+alpha_key = os.environ["ALPHA_VANTAGE_KEY"]
+
+pairs = {
+    "XAU/USD": "XAUUSD",
+    "EUR/USD": "EURUSD",
+    "GBP/JPY": "GBPJPY",
+    "USD/CHF": "USDCHF"
+}
+
+def get_rsi(pair):
+    url = f"https://www.alphavantage.co/query?function=RSI&symbol={pair}&interval=15min&time_period=14&series_type=close&apikey={alpha_key}"
+    try:
+        rsi = requests.get(url).json()["Technical Analysis: RSI"]
+        return float(list(rsi.values())[0]["RSI"])
+    except:
+        return "N/A"
+
+def get_price(pair):
+    url = f"https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency={pair[:3]}&to_currency={pair[-3:]}&apikey={alpha_key}"
+    try:
+        data = requests.get(url).json()["Realtime Currency Exchange Rate"]
+        return float(data["5. Exchange Rate"])
+    except:
+        return "N/A"
+
+def build_prompt(data):
+    prompt = "You are a professional Forex analyst. Provide a concise intraday forecast:\n\n"
+    for pair, info in data.items():
+        prompt += f"{pair}: Price={info['price']}, RSI={info['rsi']}\n"
+    prompt += "\nReturn: Trend, Entry idea, SL, TP, Confidence for each pair."
+    return prompt
+
+def ask_gpt(prompt):
+    r = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are a financial market strategist."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    return r["choices"][0]["message"]["content"]
+
+def send_telegram(text):
+    url = f"https://api.telegram.org/bot{telegram_token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+    requests.post(url, data=payload)
+
+def main():
+    data = {}
+    for name, symbol in pairs.items():
+        data[name] = {
+            "rsi": get_rsi(symbol),
+            "price": get_price(symbol)
+        }
+        time.sleep(15)  # pentru limita Alpha Vantage
+    prompt = build_prompt(data)
+    result = ask_gpt(prompt)
+    print("📊 GPT Response:\n", result)
+    send_telegram(result)
+
+if __name__ == "__main__":
+    main()
