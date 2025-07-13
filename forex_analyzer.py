@@ -34,19 +34,18 @@ def get_price(pair):
         return "N/A"
 
 def build_prompt(data):
-    prompt = "You are a Forex analyst. For each pair below, give structured intraday setups in this format:\n"
+    prompt = "You're a Forex analyst. For each pair below, give structured intraday setups in this format:\n"
     prompt += "{PAIR}: Trend, Entry, SL, TP, Confidence\n\n"
     for pair, info in data.items():
         prompt += f"{pair}: Price={info['price']}, RSI={info['rsi']}\n"
-    prompt += "\nRespond first with JSON only (for automation), then full text after. Example:\n"
-    prompt += '{ "XAU/USD": {"trend":"bullish","entry":2370,"sl":2350,"tp":2420,"confidence":"high"}, ... }\n\n'
+    prompt += "\nRespond first with JSON only, then text forecast."
     return prompt
 
 def ask_gpt(prompt):
     r = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "You are a financial market strategist."},
+            {"role": "system", "content": "You're a financial market strategist."},
             {"role": "user", "content": prompt}
         ]
     )
@@ -65,23 +64,33 @@ def send_telegram_image(image_path):
         requests.post(url, data=payload, files=files)
 
 def draw_chart(pair, price, rsi, entry=None, sl=None, tp=None):
-    fig, ax1 = plt.subplots(figsize=(6, 4))
-    ax1.set_title(f"{pair} Analysis ({datetime.now().strftime('%H:%M %d-%m-%Y')})")
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 6), gridspec_kw={'height_ratios': [3, 1]})
+    fig.suptitle(f"{pair} | {datetime.now().strftime('%H:%M %d-%m-%Y')}", fontsize=12)
 
-    ax1.plot([0, 1], [price, price], label="Price", linewidth=2)
-    ax1.axhline(70, color='red', linestyle='--', label="RSI Overbought")
-    ax1.axhline(30, color='blue', linestyle='--', label="RSI Oversold")
-    ax1.axhline(rsi, color='green', linewidth=2, label=f"RSI: {rsi:.2f}")
+    # --- ZONA DE PREȚ ---
+    ax1.plot([0, 1], [price, price], 'black', linewidth=2, label=f"Price: {price:.4f}")
+    if entry: ax1.axhline(entry, color='orange', linestyle='--', label=f"Entry: {entry}")
+    if sl:    ax1.axhline(sl, color='red', linestyle=':', label=f"SL: {sl}")
+    if tp:    ax1.axhline(tp, color='green', linestyle=':', label=f"TP: {tp}")
+    ax1.legend(loc='upper left')
+    ax1.set_ylabel("Price")
+    ax1.grid(True)
 
-    if entry: ax1.axhline(entry, color='orange', linestyle='-.', label=f"Entry: {entry}")
-    if sl: ax1.axhline(sl, color='red', linestyle=':', label=f"SL: {sl}")
-    if tp: ax1.axhline(tp, color='green', linestyle=':', label=f"TP: {tp}")
+    range_padding = abs(price * 0.01)
+    ax1.set_ylim(price - range_padding, price + range_padding)
 
-    ax1.set_ylim(price - 50, price + 50)
-    ax1.legend()
-    ax1.text(0.01, 0.01, "RDÉLUX FX AI", transform=ax1.transAxes, fontsize=8, alpha=0.4)
+    # --- ZONA DE RSI ---
+    ax2.axhline(70, color='red', linestyle='--')
+    ax2.axhline(30, color='blue', linestyle='--')
+    ax2.axhline(rsi, color='green', linewidth=2, label=f"RSI: {rsi:.2f}")
+    ax2.set_ylim(0, 100)
+    ax2.set_ylabel("RSI")
+    ax2.legend(loc='upper left')
+    ax2.grid(True)
 
-    plt.tight_layout()
+    fig.text(0.01, 0.01, "RDÉLUX FX AI", fontsize=8, color='gray', alpha=0.5)
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     filepath = f"{pair.replace('/', '')}_chart.png"
     plt.savefig(filepath)
     plt.close()
@@ -116,6 +125,7 @@ def main():
         price = data[pair]["price"]
         rsi = data[pair]["rsi"]
         strat = strategy_data.get(pair, {})
+
         if price != "N/A" and rsi != "N/A":
             chart = draw_chart(
                 pair,
@@ -129,3 +139,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
