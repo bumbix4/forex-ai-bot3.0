@@ -1,3 +1,4 @@
-openai==0.28
+openai
 requests
-matplotlib
+gspread
+oauth2client
