@@ -1,12 +1,8 @@
 {
-  "crons": [
-    {
-      "schedule": "0 5 * * *",
-      "command": "python forex_analyzer.py"
-    },
-    {
-      "schedule": "0 11 * * *",
-      "command": "python forex_analyzer.py"
-    }
-  ]
+  "type": "service_account",
+  "project_id": "forex-ai",
+  "private_key_id": "....",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEv...=\n-----END PRIVATE KEY-----\n",
+  "client_email": "forex-ai@project-id.iam.gserviceaccount.com",
+  ...
 }
